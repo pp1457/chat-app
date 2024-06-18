@@ -1,20 +1,68 @@
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <map>
 
 #include "chat_screen.hpp"
 #include <enet/enet.h>
 
 static ChatScreen chatScreen;
+static int CLIENT_ID;
 
 using std::cin;
 using std::cout;
 using std::endl;
 
-void sendPacket(ENetPeer *peer, const char * data) {
-    ENetPacket *packet = enet_packet_create(data, strlen(data) + 1, ENET_PACKET_FLAG_RELIABLE);
+void sendPacket(ENetPeer *peer, std::string data) {
+    ENetPacket *packet = enet_packet_create(data.c_str(), data.size() + 1, ENET_PACKET_FLAG_RELIABLE);
     enet_peer_send(peer, 0, packet);
 }
+
+class ClientData {
+
+private:
+    int m_id;
+    std::string m_username;
+
+public:
+    ClientData(int id): m_id(id) {}
+    void setUsername(std::string username) { m_username = username; }
+    int getID() { return m_id; }
+    std::string getUsername() { return m_username; }
+
+};
+
+std::map<int, ClientData*> client_map;
+
+void parseData(char *data) {
+	int data_type, id;
+
+	sscanf(data,"%d|%d", &data_type, &id);
+
+	switch(data_type) {
+		case 1: 
+            cout << "id = " << id << endl;
+            if(id != CLIENT_ID) {
+				char msg[100];
+				sscanf(data, "%*d|%*d|%[^\n]", &msg);
+				chatScreen.postMessage(client_map[id]->getUsername().c_str(), msg);
+			}
+			break;
+		case 2: 
+            if(id != CLIENT_ID) {
+				char username[80];
+				sscanf(data, "%*d|%*d|%[^\n]", &username);
+
+				client_map[id] = new ClientData(id);
+				client_map[id]->setUsername(username);
+		    }
+			break;
+		case 3:
+			CLIENT_ID = id;
+			break;
+	}
+}
+
 
 int main(int argc, char ** argv) {
 
@@ -36,7 +84,6 @@ int main(int argc, char ** argv) {
         return EXIT_FAILURE;
     }
 
-
     enet_address_set_host(&address, "127.0.0.1");
     address.port = 7777;
 
@@ -55,11 +102,13 @@ int main(int argc, char ** argv) {
         puts("Connection to 127.0.0.1:7777 failed.");
         return EXIT_SUCCESS;
     }
+
     cout << "Please Enter Your Username." << endl;
     std::string username;
     cin >> username;
 
-
+    std::string data = "2|" + username;
+    sendPacket(peer, data);
 
     // GAME LOOP START
 
@@ -75,25 +124,21 @@ int main(int argc, char ** argv) {
         }
 
         chatScreen.postMessage(username.c_str(), msg.c_str()); 
-        msg = username + ": " + msg;
 
-        sendPacket(peer, msg.c_str());
-        enet_host_service(client, &event, 10);
+        std::string tmp_data = "1|" + msg;
+        sendPacket(peer, tmp_data);
+
+        enet_host_service(client, &event, 1000);
         switch(event.type) {
-            case ENET_EVENT_TYPE_RECEIVE:
-                printf ("A packet of length %u containing %s was received from %x:%u on channel %u.\n",
-                (unsigned int)event.packet -> dataLength,
-                event.packet -> data,
-                event.peer -> address.host,
-                event.peer -> address.port,
-                event.channelID);
+            case ENET_EVENT_TYPE_RECEIVE: {
+                cout << "Hi I receive a packet!" << endl;
+                parseData((char *)event.packet->data);
+                enet_packet_destroy(event.packet);
                 break;
-            case ENET_EVENT_TYPE_CONNECT:
+            }
+            default: {
                 break;
-            case ENET_EVENT_TYPE_NONE:
-                break;
-            case ENET_EVENT_TYPE_DISCONNECT:
-                break;
+            }
         }
     }
     chatScreen.end();
@@ -110,9 +155,7 @@ int main(int argc, char ** argv) {
             case ENET_EVENT_TYPE_DISCONNECT:
                 puts("Disconnection succeeded.");
                 break;
-            case ENET_EVENT_TYPE_CONNECT:
-                break;
-            case ENET_EVENT_TYPE_NONE:
+            default:
                 break;
         }
     }
