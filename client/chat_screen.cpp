@@ -12,6 +12,7 @@ void ChatScreen::end() {
 
 void ChatScreen::init() {
     initscr();
+    nodelay(stdscr, TRUE);
 
     int yMax, xMax;
     getmaxyx(stdscr, yMax, xMax);

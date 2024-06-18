@@ -2,6 +2,8 @@
 #include <string>
 #include <cstring>
 #include <map>
+#include <thread>
+#include <atomic>
 
 #include "chat_screen.hpp"
 #include <enet/enet.h>
@@ -41,17 +43,16 @@ void parseData(char *data) {
 
 	switch(data_type) {
 		case 1: 
-            cout << "id = " << id << endl;
             if(id != CLIENT_ID) {
 				char msg[100];
-				sscanf(data, "%*d|%*d|%[^\n]", &msg);
+				sscanf(data, "1|%*d|%[^\n]", &msg);
 				chatScreen.postMessage(client_map[id]->getUsername().c_str(), msg);
 			}
 			break;
 		case 2: 
             if(id != CLIENT_ID) {
 				char username[80];
-				sscanf(data, "%*d|%*d|%[^\n]", &username);
+				sscanf(data, "2|%*d|%[^\n]", &username);
 
 				client_map[id] = new ClientData(id);
 				client_map[id]->setUsername(username);
@@ -61,6 +62,27 @@ void parseData(char *data) {
 			CLIENT_ID = id;
 			break;
 	}
+}
+
+ENetHost* client;
+std::atomic<bool> stopHandleEnet(false);
+
+void handleEnet() {
+    while (!stopHandleEnet) {
+        ENetEvent event;
+        while (enet_host_service(client, &event, 0) > 0) {
+            switch(event.type) {
+                case ENET_EVENT_TYPE_RECEIVE: {
+                    parseData((char *)event.packet->data);
+                    enet_packet_destroy(event.packet);
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+        }
+    }
 }
 
 
@@ -76,7 +98,6 @@ int main(int argc, char ** argv) {
     ENetEvent event; 
     ENetPeer* peer;
 
-    ENetHost* client;
     client = enet_host_create(NULL, 1, 1, 0, 0);
 
     if (!client) {
@@ -110,6 +131,8 @@ int main(int argc, char ** argv) {
     std::string data = "2|" + username;
     sendPacket(peer, data);
 
+    std::thread t1(handleEnet);
+
     // GAME LOOP START
 
     chatScreen.init();
@@ -121,27 +144,20 @@ int main(int argc, char ** argv) {
 
         if (msg == "!EXIT") {
             running = false;
+            break;
         }
 
         chatScreen.postMessage(username.c_str(), msg.c_str()); 
 
         std::string tmp_data = "1|" + msg;
         sendPacket(peer, tmp_data);
-
-        enet_host_service(client, &event, 1000);
-        switch(event.type) {
-            case ENET_EVENT_TYPE_RECEIVE: {
-                cout << "Hi I receive a packet!" << endl;
-                parseData((char *)event.packet->data);
-                enet_packet_destroy(event.packet);
-                break;
-            }
-            default: {
-                break;
-            }
-        }
     }
+
     chatScreen.end();
+
+    stopHandleEnet = true;
+
+    t1.join();
 
     // GAME LOOP END
 

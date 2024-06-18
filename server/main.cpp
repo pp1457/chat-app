@@ -94,7 +94,7 @@ int main(int argc, char ** argv) {
                     for (auto const &x: client_map) {
                         char tmp_data[200] = {'\0'};
                         std::string data = "2|" + std::to_string(x.first) + "|" + x.second->getUsername();
-                        sendPacket(event.peer, data);
+                        broadcastPacket(server, data);
                     }
 
                     player_cnt++;
@@ -106,7 +106,6 @@ int main(int argc, char ** argv) {
                     
                     break;
                 }
-
                 case ENET_EVENT_TYPE_RECEIVE: {
                     printf ("A packet of length %u was received from %x:%u on channel %u.\n",
                         (unsigned int)event.packet -> dataLength,
