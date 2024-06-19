@@ -34,7 +34,7 @@ std::string ChatScreen::checkBoxInput() {
     return msg;
 }
 
-void ChatScreen::postMessage(const char username[82], const char msg[100]) {
+void ChatScreen::postMessage(const char username[80], const char msg[100]) {
     mvprintw(msg_y, 1, "%s: %s", username, msg);
     refresh();
     msg_y++;
