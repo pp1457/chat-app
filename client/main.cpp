@@ -6,6 +6,7 @@
 #include <atomic>
 
 #include "chat_screen.hpp"
+#include "enet_client.hpp"
 #include <enet/enet.h>
 
 static ChatScreen chatScreen;
@@ -15,10 +16,6 @@ using std::cin;
 using std::cout;
 using std::endl;
 
-void sendPacket(ENetPeer *peer, std::string data) {
-    ENetPacket *packet = enet_packet_create(data.c_str(), data.size() + 1, ENET_PACKET_FLAG_RELIABLE);
-    enet_peer_send(peer, 0, packet);
-}
 
 class ClientData {
 
@@ -35,6 +32,7 @@ public:
 };
 
 std::map<int, ClientData*> client_map;
+ENetClient enetClient;
 
 void parseData(char *data) {
 	int data_type, id;
@@ -64,74 +62,19 @@ void parseData(char *data) {
 	}
 }
 
-ENetHost* client;
-std::atomic<bool> stopHandleEnet(false);
-
-void handleEnet() {
-    while (!stopHandleEnet) {
-        ENetEvent event;
-        while (enet_host_service(client, &event, 0) > 0) {
-            switch(event.type) {
-                case ENET_EVENT_TYPE_RECEIVE: {
-                    parseData((char *)event.packet->data);
-                    enet_packet_destroy(event.packet);
-                    break;
-                }
-                default: {
-                    break;
-                }
-            }
-        }
-    }
-}
-
 
 int main(int argc, char ** argv) {
 
-    if (enet_initialize()) {
-        fprintf(stderr, "An error occurred while initializing ENet.\n");
-        return EXIT_FAILURE;
-    }
-    atexit(enet_deinitialize);
-
-    ENetAddress address; // IP and port of the server
-    ENetEvent event; 
-    ENetPeer* peer;
-
-    client = enet_host_create(NULL, 1, 1, 0, 0);
-
-    if (!client) {
-        fprintf(stderr, "An error occurred while trying to create an ENet client host.\n");
-        return EXIT_FAILURE;
-    }
-
-    enet_address_set_host(&address, "127.0.0.1");
-    address.port = 7777;
-
-    peer = enet_host_connect(client, &address, 1, 0);
-    if (!peer) {
-        fprintf(stderr, "No available peers for initiating an ENet connection!\n");
-        return EXIT_FAILURE;
-    }
-
-    if (enet_host_service(client, &event, 5000) > 0 && 
-            event.type == ENET_EVENT_TYPE_CONNECT) {
-        puts("Connection to 127.0.0.1:7777 succeeded.");
-
-    } else {
-        enet_peer_reset(peer);
-        puts("Connection to 127.0.0.1:7777 failed.");
-        return EXIT_SUCCESS;
-    }
+    enetClient.setupConnection();
 
     cout << "Please Enter Your Username." << endl;
     std::string username;
     cin >> username;
 
     std::string data = "2|" + username;
-    sendPacket(peer, data);
+    enetClient.sendPacket(data);
 
-    std::thread t1(handleEnet);
+    std::thread t1(enetClient.handleEnet);
 
     // GAME LOOP START
 
@@ -150,31 +93,15 @@ int main(int argc, char ** argv) {
         chatScreen.postMessage(username.c_str(), msg.c_str()); 
 
         std::string tmp_data = "1|" + msg;
-        sendPacket(peer, tmp_data);
+        enetClient.sendPacket(tmp_data);
     }
 
     chatScreen.end();
-
-    stopHandleEnet = true;
-
+    enetClient.disconnect();
     t1.join();
 
     // GAME LOOP END
-
-    enet_peer_disconnect(peer, 0);
-
-    while (enet_host_service(client, &event, 10) > 0) {
-        switch(event.type) {
-            case ENET_EVENT_TYPE_RECEIVE:
-                enet_packet_destroy(event.packet);
-                break;
-            case ENET_EVENT_TYPE_DISCONNECT:
-                puts("Disconnection succeeded.");
-                break;
-            default:
-                break;
-        }
-    }
+    
 
     return EXIT_SUCCESS;
 
