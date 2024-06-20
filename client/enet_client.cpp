@@ -7,7 +7,7 @@ void ENetClient::connectToServer(char * ip, int port) {
     server = enet_host_connect(client, &address, 1, 0);
     if (!server) {
         fprintf(stderr, "No available server for initiating an ENet connection!\n");
-        return;
+        exit(1);
     }
 
     if (enet_host_service(client, &event, 1000) > 0 && 
@@ -17,9 +17,27 @@ void ENetClient::connectToServer(char * ip, int port) {
     } else {
         enet_peer_reset(server);
         printf("Connection to server@%s:%d failed.", ip, port);
-        return;
+        exit(1);
     }
 
+}
+
+void ENetClient::keepENetConnection() {
+    while (!stopENetConnection) {
+        ENetEvent event;
+        while (enet_host_service(client, &event, 0) > 0) {
+            switch(event.type) {
+                case ENET_EVENT_TYPE_RECEIVE: {
+                    parseData((char *)event.packet->data);
+                    enet_packet_destroy(event.packet);
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+        }
+    }
 }
 
 void ENetClient::setupConnection() {
@@ -47,26 +65,10 @@ void ENetClient::sendPacket(std::string data) {
     enet_peer_send(server, 0, packet);
 }
 
-void ENetClient::keepENetConnection() {
-    while (!stopENetConnection) {
-        ENetEvent event;
-        while (enet_host_service(client, &event, 0) > 0) {
-            switch(event.type) {
-                case ENET_EVENT_TYPE_RECEIVE: {
-                    parseData((char *)event.packet->data);
-                    enet_packet_destroy(event.packet);
-                    break;
-                }
-                default: {
-                    break;
-                }
-            }
-        }
-    }
-}
 
 void ENetClient::disconnect() {
     stopENetConnection = true;
+
     enet_peer_disconnect(server, 0);
     while (enet_host_service(client, &event, 10) > 0) {
         switch(event.type) {

@@ -4,7 +4,6 @@
 #include <iostream>
 #include <string>
 #include <cstring>
-#include <map>
 #include <thread>
 #include <atomic>
 
@@ -20,11 +19,12 @@ private:
     ENetAddress address; 
     ENetEvent event; 
     ENetPeer* server;
+    void connectToServer(char * ip, int port);
+    virtual void parseData(char *data) = 0;
 
+protected:
     std::atomic<bool> stopENetConnection;
 
-    void connectToServer(char * ip, int port);
-    virtual void parseData(char *data);
 
 public:
     void setupConnection();
