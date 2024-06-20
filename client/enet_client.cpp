@@ -12,11 +12,11 @@ void ENetClient::connectToServer(char * ip, int port) {
 
     if (enet_host_service(client, &event, 1000) > 0 && 
             event.type == ENET_EVENT_TYPE_CONNECT) {
-        printf("Connection to server@%s:%d succeeded.", ip, port);
+        printf("Connection to server@%s:%d succeeded!\n", ip, port);
 
     } else {
         enet_peer_reset(server);
-        printf("Connection to server@%s:%d failed.", ip, port);
+        printf("Connection to server@%s:%d failed...\n", ip, port);
         exit(1);
     }
 

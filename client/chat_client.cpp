@@ -13,14 +13,14 @@ void ChatClient::parseData(char *data) {
         case 1: 
             if(id != client_id) {
                 char msg[100];
-                sscanf(data, "1|%*d|%[^\n]", &msg);
+                sscanf(data, "1|%*d|%[^\n]", msg);
                 chatScreen.postMessage(client_map[id]->getUsername().c_str(), msg);
             }
             break;
         case 2: 
             if(id != client_id) {
                 char username[80];
-                sscanf(data, "2|%*d|%[^\n]", &username);
+                sscanf(data, "2|%*d|%[^\n]", username);
 
                 client_map[id] = new ClientData(id);
                 client_map[id]->setUsername(username);

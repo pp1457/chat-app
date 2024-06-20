@@ -29,7 +29,7 @@ std::string ChatScreen::checkBoxInput() {
     wrefresh(inputwin);
 
     char msg[100];
-    mvwscanw(inputwin, 1, 1, "%[^\n]", msg);
+    mvwscanw(inputwin, 1, 1, (char*)"%[^\n]", msg);
 
     return msg;
 }
